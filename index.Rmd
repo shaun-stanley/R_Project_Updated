@@ -1,0 +1,514 @@
+---
+title: "R Project"
+author: "Shaun Stanley"
+date: "29/10/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r load libraries, include=FALSE}
+library(tidyverse)
+library(humaniformat) # used to convert from First Name Last Name to Last Name, First Name
+library(tidytext)
+library(gutenbergr)
+```
+
+
+
+```{r gutenberg_works, include=FALSE}
+## Import data
+
+temp <- gutenberg_works()
+```
+
+```{r gutenberg_kipling_download, eval=FALSE, include=FALSE}
+kipling_download <- gutenberg_works() %>%
+                        filter(str_detect(author, "Kipling")) %>% 
+                      gutenberg_download(mirror="https://gutenberg.pglaf.org/", meta_fields = c("title", "author"))
+
+```
+
+```{r gutenberg_twain_download, eval=FALSE, include=FALSE}
+twain_download <- gutenberg_works() %>%
+                        filter(str_detect(author, "Twain")) %>% 
+                      gutenberg_download(mirror="https://gutenberg.pglaf.org/", meta_fields = c("title", "author"))
+```
+
+
+
+
+```{r backup_data_kipling, eval=FALSE, include=FALSE}
+
+## Backing up data
+
+write_csv(twain_download, "twain_download.csv")
+```
+
+```{r backup_data_twain, eval=FALSE, include=FALSE}
+write_csv(kipling_download, "kipling_download.csv")
+```
+
+
+
+```{r restore_data, include=FALSE}
+
+## Restoring data
+
+kipling_import <- read_csv("kipling_download.csv")
+twain_import <- read_csv("twain_download.csv")
+```
+
+```{r, include=FALSE}
+kipling_import <- kipling_import %>%
+    mutate(year = case_when(title == "Plain Tales from the Hills" ~ "1888",
+                          title == "Soldiers Three" ~ "1888",
+                          title == "The Man Who Would Be King" ~ "1888",
+                          title == "The Phantom Rickshaw and Other Ghost Stories" ~ "1888",
+                          title == "Under the Deodars" ~ "1888",
+                          title == "Wee Willie Winkie and Other Stories Volume 2" ~ "1888",
+                          title == "In Black and White" ~ "1889",
+                          title == "Indian Tales" ~ "1819",
+                          title == "The Light that Failed" ~ "1890",
+                          title == "Life's Handicap" ~ "1891",
+                          title == "The Bridge Builders" ~ "1893",
+                          title == "The Jungle Book" ~ "1894",
+                          title == "The Second Jungle Book" ~ "1895",
+                          title == "Captains Courageous" ~ "1896",
+                          title == "Soldier Stories" ~ "1896",
+                          title == "Soldiers Three Part 2" ~ "1897",
+                          title == "The City of Dreadful Night" ~ "1898",
+                          title == "The Day's Work Volume 1" ~ "1898",
+                          title == "Rewards and Fairies" ~ "1899",
+                          title == "Stalky and Co" ~ "1899",
+                          title == "Kim" ~ "1901",
+                          title == "Just So Stories" ~ "1902",
+                          title == "With the Night Mail" ~ "1909",
+                          title == "The Eyes of Asia" ~ "1916",
+                          title == "Land and Sea Tales for Boys and Girls" ~ "1923",)) %>% # Adds the corresponding years to each title
+  arrange(year) # Arranging the table by year
+```
+
+```{r, include=FALSE}
+twain_import <- twain_import %>%
+    mutate(year = case_when(title == "A Connecticut Yankee" ~ "1889",
+                          title == "Those Extraordinary Twins" ~ "1893",
+                          title == "The Tragedy of Pudd'nhead Wilson" ~ "1893",
+                          title == "Adventures of Huckleberry Finn" ~ "1884",
+                          title == "The Adventures of Tom Sawyer" ~ "1876",
+                          title == "Personal Recollections of Joan of Arc" ~ "1896",
+                          title == "The Stolen White Elephant" ~ "1882",
+                          title == "The American Claimant" ~ "18",
+                          title == "The ś1,000,000 bank-note, and other new stories" ~ "1893",
+                          title == "Alonzo Fitz, and Other Stories" ~ "1904",
+                          title == "Tom Sawyer, Detective" ~ "1896",
+                          title == "The Prince and the Pauper" ~ "1881",
+                          title == "The Mysterious Stranger A Romance" ~ "1916",
+                          title == "The Man That Corrupted Hadleyburg, and Other Stories" ~ "1900",
+                          title == "Tom Sawyer Abroad" ~ "1894",
+                          title == "The $30,000 Bequest, and Other Stories" ~ "1906",
+                          title == "A Tramp Abroad" ~ "1880",
+                          title == "The Innocents abroad" ~ "1869",
+                          title == "The Mysterious Stranger, and Other Stories" ~ "1916",
+                          title == "Personal Recollections of Joan of Arc Volume 2" ~ "1896",
+                          title == "A Double Barrelled Detective Story" ~ "1902",
+                          title == "Roughing It" ~ "1872",
+                          title == "A Horse's Tale" ~ "1906",
+                          title == "Life on the Mississippi" ~ "1883",)) %>% # Adds the corresponding years to each title
+  arrange(year) # Arranging the table by year
+```
+
+```{r kipling_author, include=FALSE}
+
+
+## Modelling Data
+
+### Adding Author
+
+kipling_authors <- bind_rows(kipling_import)
+```
+
+```{r twain_author, include=FALSE}
+twain_authors <- bind_rows(twain_import)
+```
+
+```{r kipling_column, include=FALSE}
+kipling_authors <- kipling_authors %>% 
+                mutate(author ="Kipling")
+```
+
+```{r twain_column, include=FALSE}
+twain_authors <- twain_authors %>% 
+                mutate(author ="Twain")
+```
+
+```{r all_authors, include=FALSE}
+all_authors <- bind_rows(kipling_authors, twain_authors)
+```
+
+
+
+```{r tidy_all_authors, include=FALSE}
+
+### Tidying the Text
+
+tidy_all_authors <- all_authors %>% 
+                    unnest_tokens(word, text) %>% 
+                    anti_join(stop_words)
+```
+
+
+
+```{r adding_words, include=FALSE}
+
+### Creating operationalizing words
+
+bravery_words <- c("brave","adventure", "confident", "confidently", "courage", "fear")
+
+bravery_df <- data_frame(word = bravery_words, bravery = TRUE)
+
+friendship_words <- c("friend","chum", "partner", "pal", "buddy")
+
+friendship_df <- data_frame(word = friendship_words, friendship = TRUE)
+
+courage_words <- c("courage", "dare", "dared", " brave","fear", "hero")
+
+courage_df <- data_frame(word = courage_words, courage = TRUE)
+
+duty_words <- c("duty", "burden", "job", " work","ought")
+
+duty_df <- data_frame(word = duty_words, duty = TRUE)
+```
+
+
+
+```{r tagged_words, include=FALSE}
+
+#We can add these words by using a left_join. A left join will keep everything on left hand side 
+
+all_authors_tagged <- tidy_all_authors %>% 
+                                left_join(bravery_df) %>% 
+                                left_join(friendship_df) %>%
+                                left_join(courage_df) %>% 
+                                left_join(duty_df)
+```
+
+
+
+```{r calculate_words, include=FALSE}
+
+#We can then establish some basic percentages for the use of each word.
+
+all_authors_table <- all_authors_tagged %>% 
+                     group_by(author) %>% 
+                     count(bravery, friendship, courage, duty) %>% 
+                     mutate (percent = n/sum(n)*100)
+```
+
+```{r load_libraries, include=FALSE}
+library(gutenbergr)
+library(tidytext)
+library(tidyverse)
+library(scales)
+library(ggthemes)
+```
+
+
+
+```{r relative_frequency_long_bravery, include=FALSE}
+
+## Part 2: Basic EDA with ggplot
+
+all_authors_frequency <- all_authors_tagged %>%
+  group_by(title) %>%
+  add_count(name = "length") %>%
+  mutate(bravery_count = sum(bravery, na.rm = TRUE)) %>%
+  mutate(relative_frequency = bravery_count / length) %>%
+  select(author, title, relative_frequency) %>% 
+  distinct()
+```
+
+```{r relative_frequency_long_friendship, include=FALSE}
+all_authors_frequency <- all_authors_tagged %>%
+  group_by(title) %>%
+  add_count(name = "length") %>%
+  mutate(friendship_count = sum(friendship, na.rm = TRUE)) %>%
+  mutate(relative_frequency = friendship_count / length) %>%
+  select(author, title, relative_frequency) %>% 
+  distinct()
+```
+
+```{r relative_frequency_long_courage, include=FALSE}
+all_authors_frequency <- all_authors_tagged %>%
+  group_by(title) %>%
+  add_count(name = "length") %>%
+  mutate(courage_count = sum(courage, na.rm = TRUE)) %>%
+  mutate(relative_frequency = courage_count / length) %>%
+  select(author, title, relative_frequency) %>% 
+  distinct()
+```
+
+```{r relative_frequency_long_duty, include=FALSE}
+all_authors_frequency <- all_authors_tagged %>%
+  group_by(title) %>%
+  add_count(name = "length") %>%
+  mutate(duty_count = sum(duty, na.rm = TRUE)) %>%
+  mutate(relative_frequency = duty_count / length) %>%
+  select(author, title, relative_frequency) %>% 
+  distinct()
+```
+
+
+
+```{r relative_frequency_short, message=FALSE, include=FALSE}
+
+#This is quite a number of steps. We can refactor this with the `summarise` function to read:
+
+all_authors_frequency_short <- all_authors_tagged %>%
+  group_by(author, title) %>%
+  summarise(relative_frequency_short =
+              sum(bravery, na.rm = TRUE) / n())
+```
+
+
+
+```{r histogram_bravery}
+
+### Grouping variables in a histogram`
+
+all_authors_tagged %>%
+  group_by(author, title) %>%
+  #Run the same summary function, but instead of only creating one column                      create two.
+  summarise(
+    bravery = sum(bravery, na.rm = TRUE) / n(),
+  ) %>%
+  #Pivot the table longer and put the column names next to their relative                      frequency values.
+  pivot_longer(bravery,
+               names_to = "concept",
+               values_to = "relative_frequency") %>%
+  #Clean up the variable by capitalizing them.
+  mutate(author = str_to_title(author), concept =
+           str_to_title(concept)) %>%
+  ggplot(aes(relative_frequency, fill = author)) +
+  geom_histogram(
+    color = "black",
+    alpha = .5,
+    position = "identity",
+    bins = 5
+  ) +
+  labs(title = "Bravery by Author",
+       x = "Relative Frequency of Bravery Words",
+       y = "Number of Texts",
+       fill = "Author") +
+  facet_wrap(vars(author, concept)) +
+  theme_clean()
+```
+
+```{r histogram_friendship}
+all_authors_tagged %>%
+  group_by(author, title) %>%
+  #Run the same summary function, but instead of only creating one column                      create two.
+  summarise(
+    friendship = sum(friendship, na.rm = TRUE) / n(),
+  ) %>%
+  #Pivot the table longer and put the column names next to their relative                      frequency values.
+  pivot_longer(friendship,
+               names_to = "concept",
+               values_to = "relative_frequency") %>%
+  #Clean up the variable by capitalizing them.
+  mutate(author = str_to_title(author), concept =
+           str_to_title(concept)) %>%
+  ggplot(aes(relative_frequency, fill = author)) +
+  geom_histogram(
+    color = "black",
+    alpha = .5,
+    position = "identity",
+    bins = 5
+  ) +
+  labs(title = "Friendship by Author",
+       x = "Relative Frequency of Friendship Words",
+       y = "Number of Texts",
+       fill = "Author") +
+  facet_wrap(vars(author, concept)) +
+  theme_clean()
+```
+
+```{r histogram_courage}
+all_authors_tagged %>%
+  group_by(author, title) %>%
+  #Run the same summary function, but instead of only creating one column                      create two.
+  summarise(
+    courage = sum(courage, na.rm = TRUE) / n(),
+  ) %>%
+  #Pivot the table longer and put the column names next to their relative                      frequency values.
+  pivot_longer(courage,
+               names_to = "concept",
+               values_to = "relative_frequency") %>%
+  #Clean up the variable by capitalizing them.
+  mutate(author = str_to_title(author), concept =
+           str_to_title(concept)) %>%
+  ggplot(aes(relative_frequency, fill = author)) +
+  geom_histogram(
+    color = "black",
+    alpha = .5,
+    position = "identity",
+    bins = 5
+  ) +
+  labs(title = "Courage by Author",
+       x = "Relative Frequency of Courage Words",
+       y = "Number of Texts",
+       fill = "Author") +
+  facet_wrap(vars(author, concept)) +
+  theme_clean()
+```
+
+```{r histogram_duty}
+all_authors_tagged %>%
+  group_by(author, title) %>%
+  #Run the same summary function, but instead of only creating one column                      create two.
+  summarise(
+    duty = sum(duty, na.rm = TRUE) / n(),
+  ) %>%
+  #Pivot the table longer and put the column names next to their relative                      frequency values.
+  pivot_longer(duty,
+               names_to = "concept",
+               values_to = "relative_frequency") %>%
+  #Clean up the variable by capitalizing them.
+  mutate(author = str_to_title(author), concept =
+           str_to_title(concept)) %>%
+  ggplot(aes(relative_frequency, fill = author)) +
+  geom_histogram(
+    color = "black",
+    alpha = .5,
+    position = "identity",
+    bins = 5
+  ) +
+  labs(title = "Duty by Author",
+       x = "Relative Frequency of Duty Words",
+       y = "Number of Texts",
+       fill = "Author") +
+  facet_wrap(vars(author, concept)) +
+  theme_clean()
+```
+
+
+
+```{r all_author_sentences, include=FALSE}
+
+##Sentiment Analysis
+
+all_authors_sentence <- all_authors %>%
+  group_by(author, title, text) %>%
+  summarise (text = paste(text, collapse = "")) %>%
+  unnest_regex(sentences, text, pattern = "[.?!]", to_lower = FALSE)  
+```
+
+```{r author_sentence_nr, include=FALSE}
+author_sentence_nr <- all_authors_sentence %>%
+  ungroup() %>%
+  mutate(sentence_number = row_number()) %>%
+  group_by(author, title, sentence_number) %>%
+  unnest_tokens(word, sentences) %>%
+  anti_join(stop_words)
+```
+
+
+
+```{r author_concept, include=FALSE}
+
+### Adding the concepts
+
+author_concept <-  author_sentence_nr %>%
+  left_join(bravery_df) %>%
+  left_join(friendship_df) %>%
+  left_join(courage_df) %>%
+  left_join(duty_df) 
+```
+
+```{r author_concept_sentiment, include=FALSE}
+author_concept_sentiment <- author_concept %>%
+  inner_join(get_sentiments("bing"))
+```
+
+
+
+```{r author_sentiment_total, include=FALSE}
+
+### Calculating sentiment total
+
+author_sentiment_total <- author_concept_sentiment %>%
+  count(sentence_number, sentiment) %>%
+  pivot_wider(names_from = sentiment,
+              values_from = n,
+              values_fill = 0)  %>%
+  mutate(sentiment = positive - negative) %>%
+  left_join(author_concept) %>%
+  filter(bravery == TRUE | friendship == TRUE | courage == TRUE | duty == TRUE)
+```
+
+
+
+```{r author_sentiment_table_bravery_friendship, include=FALSE}
+
+### Calculating sentiment by concept word
+
+author_sentiment_table <- author_sentiment_total %>%
+  pivot_longer(bravery:friendship,
+               names_to = "concept",
+               values_to = "total_sentiment")  %>%
+  drop_na() %>%
+  group_by(author, concept) %>%
+  summarise (total = sum(sentiment)) %>%
+  ungroup()
+```
+
+```{r author_sentiment_table_courage_duty, include=FALSE}
+
+author_sentiment_table <- author_sentiment_total %>%
+  pivot_longer(courage:duty,
+               names_to = "concept",
+               values_to = "total_sentiment")  %>%
+  drop_na() %>%
+  group_by(author, concept) %>%
+  summarise (total = sum(sentiment)) %>%
+  ungroup()
+
+
+```
+
+
+
+```{r author_sentiment_plot, include=FALSE}
+
+### Plotting sentiment
+
+author_sentiment_plot <- author_sentiment_table %>%
+  ggplot(aes(author, y = total, fill = author)) +
+  geom_col(color = "black",
+           alpha = .7,
+           position = "identity") +
+  facet_wrap(~ concept) +
+  labs(title = "Positive and Negative Sentiment by Concept",
+       x = "Overal Sentiment",
+       y = "Author",
+       fill = "Yes") +
+  coord_flip() 
+```
+
+```{r final_chart}
+author_sentiment_table %>%
+  mutate(author = str_to_title(author)) %>%
+  mutate(concept = str_to_title(concept)) %>%
+  ggplot(aes(reorder(author, -total), y = total, fill = authoe)) +
+  geom_col(color = "black",
+           alpha = .7,
+           position = "identity") +
+  facet_wrap(~ concept) +
+  labs(title = "Positive and Negative Sentiment by Concept",
+       x = "Overal Sentiment",
+       y = "Author",
+       fill = "Yes") +
+  scale_fill_brewer(palette = "Dark2") +
+  coord_flip() +
+  theme_hc()
+```
